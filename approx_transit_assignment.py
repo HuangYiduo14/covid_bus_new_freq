@@ -6,6 +6,7 @@ BigFreq = 99999
 BigCap = 99999
 LineCap = 30
 TransDistance = 0.1
+EPS = 1e-9
 
 def generate_station_dict_from_line_dict(line_dict):
     station_dict = {station: [] for station in station_loc.keys()}
@@ -97,6 +98,47 @@ def solve_transit_assignment_LP(G,OD,problem_name='0'):
     return model,v,w
 
 
+def assign_vd_2_vod(v_val, OD, G):
+    set_OD = list(OD.keys())
+    set_D = list(set([od[1] for od in set_OD]))
+    v_od_dict = dict()
+    # to assign vd to vod, we first identify the subgraph with vd>0, which should be acyclic DAG,
+    # we do topological sorting and assign each OD from the O's topological order to the end.
+    # Starting from o, we should assign to the flow to the neighbor node with the smallest topological order
+    for d in set_D:
+        selected_edges = [(u,v) for u,v in G.edges() if v_val[d,u,v]>EPS]
+        sg_d = G.edge_subgraph(selected_edges)
+        assert nx.algorithms.dag.is_directed_acyclic_graph(sg_d)
+        topo_sort = list(nx.algorithms.dag.topological_sort(sg_d))
+        for (o,d1) in set_OD:
+            if d1==d:
+                temp_sorted = topo_sort[topo_sort.index(o):]
+                V_od_val = {node:0. for node in temp_sorted}
+                V_od_val[o] = OD[(o,d)]
+                v_od_val_edge = dict()
+                for node in temp_sorted:
+                    if V_od_val[node]>EPS:
+                        next_nodes = list(sg_d.successors(node))
+                        total_d_flow = sum([v_val[d,node,node1] for node1 in next_nodes])
+                        for node2 in next_nodes:
+                            this_flow = V_od_val[node] * v_val[d,node,node2]/total_d_flow
+                            V_od_val[node2] += this_flow
+                            if (node,node2) in v_od_val_edge.keys():
+                                v_od_val_edge[(node,node2)]+= this_flow
+                            else:
+                                v_od_val_edge[(node,node2)] = this_flow
+                v_od_dict[(o,d1)] = v_od_val_edge
+                assert abs(V_od_val[d]-OD[(o,d)])<EPS
+    return v_od_dict
+
+
+
+
+
+
+    return
+
+
 if __name__ =='__main__':
     # name of line and station: underscore is not allowed
     G0 = nx.MultiDiGraph()
@@ -137,3 +179,7 @@ if __name__ =='__main__':
     # nx.draw(G,pos,with_labels=True, edge_color = colors, connectionstyle='arc3, rad = 0.1')
     model,v,w = solve_transit_assignment_LP(G, OD, problem_name='0')
     cons_nonzeroPI = {cons.ConstrName:cons.PI for cons in model.getConstrs() if abs(cons.PI)>1e-10 and cons.ConstrName.split(',')[0]=='capacity'}
+    v_val = {key: val.X for key, val in v.items()}
+    v_od_dict = assign_vd_2_vod(v_val, OD, G)
+
+
