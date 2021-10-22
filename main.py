@@ -1,9 +1,25 @@
 import numpy as np
-import networkx as nx
-from approx_transit_assignment import solve_transit_assignment_LP, assign_vd_2_vod
-from generate_graph import genearte_freq_graph, generate_physical_graph
+from generate_graph import genearte_freq_graph, generate_physical_graph, generate_station_dict_from_line_dict
+from frequency_design import get_result
 import pandas as pd
 from global_var_define import *
+import multiprocessing
+import tqdm
+cpu_count = multiprocessing.cpu_count()
+
+# node naming rules:
+# [station name]_[line name]|[type name]
+# example1: station1_red0 for the line node for line red for 0 direction at station 1
+# example2: station1_enter is the entrance node at station 1
+
+# arc type:
+# line node -> line node: inv (in-vehicle transit)
+# line node -> exit node: alighting
+# enter node -> line node: boarding
+# exit node -> enter node: transfer
+
+# o node must be an enter node
+# d node must be an exit node
 
 if __name__ =='__main__':
     # name of line and station: underscore is not allowed
@@ -42,11 +58,41 @@ if __name__ =='__main__':
     # use the info above to generate the physical and frequency graph
     G0 = generate_physical_graph(station_loc, line_dict, distance_dict)
     G = genearte_freq_graph(line_dict, station_loc, distance_dict, line_freq_dict)
-    # solve the assignment problem and assign OD
-    model,v,w = solve_transit_assignment_LP(G, OD, problem_name='0')
-    #cons_nonzeroPI = {cons.ConstrName:cons.PI for cons in model.getConstrs() if abs(cons.PI)>1e-10 and cons.ConstrName.split(',')[0]=='capacity'}
-    v_val = {key: val.X for key, val in v.items()}
-    v_od_dict = assign_vd_2_vod(v_val, OD, G)
+    # calculate obj function
+    station_dict = generate_station_dict_from_line_dict(line_dict, station_loc.keys())
+
+
+    def obj_func(line_freq_dict1):
+        return get_result(G, line_freq_dict1, station_dict, line_dict, OD, SIR_location_table)
+
+
+
+    cand_set = [10.,11.,12.,13.,14.,15.,16.,20.]
+    cand_list = []
+    cand_num_list = []
+    for f_red in cand_set:
+        for f_blue in cand_set:
+            for f_yellow in cand_set:
+                for f_green in cand_set:
+                    cand_list.append(
+                        {
+                            'red0':f_red,'blue0':f_blue,'green0':f_green,'yellow0':f_yellow,
+                            'red1': f_red, 'blue1': f_blue, 'green1': f_green, 'yellow1': f_yellow
+                         }
+                    )
+                    cand_num_list.append([f_red,f_blue,f_green,f_yellow])
+    all_results = []
+    #with multiprocessing.Pool(cpu_count) as pool:
+    #    for result in tqdm.tqdm(pool.imap_unordered(obj_func, cand_list),total=len(cand_list)):
+    for cand_freq in cand_list:
+        print(cand_freq,'--'*20)
+        result = obj_func(cand_freq)
+        print(result)
+        all_results.append(result)
+
+    result_df = pd.DataFrame([cand_num_list[i]+[all_results[i]] for i in range(len(cand_list))],columns=['red','blue','green','yellow','encounters'])
+    result_df.to_csv('exp_results0.csv')
+
 
 
 

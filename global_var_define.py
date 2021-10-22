@@ -6,3 +6,7 @@ LineCap = 30
 TransDistance = 0.1
 EPS = 1e-9
 RANDOM_SEED= 1
+DELAY_FUNC_TYPE = 'BPR' #{'BPR', 'GEO'}
+EPS_BOARDING = 1./100.
+BPR_ALPHA = 0.15
+BPR_BETA = 4.
