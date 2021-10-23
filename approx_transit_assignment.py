@@ -36,7 +36,7 @@ def solve_transit_assignment_LP(G,OD,problem_name='0'):
             for j in list(G.successors(i)):
                 if G[i][j]['type']=='boarding':
                     model.addConstr(
-                        v[d,i,j]<=G[i][j]['frequency']*w[d, i],
+                        v[d,i,j]-G[i][j]['frequency']*w[d, i]<=0.,
                         name='wait_time,'+d+','+i+','+j
                     )
     for a in set_Arc:

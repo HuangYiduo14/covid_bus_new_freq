@@ -23,7 +23,7 @@ def get_result(G, line_freq_dict, station_dict, line_dict, OD, SIR_location_tabl
         v_od_dict_full = [[i[0], i[1], j[0], j[1], v_od_dict[i][j]] for i in v_od_dict.keys() for j in v_od_dict[i].keys()]
         v_od_df = pd.DataFrame(v_od_dict_full, columns=['o', 'd', 'i', 'j', 'flow'])
     total_encounter, _, _, _, _ = calculate_covid_contact(G, v_od_df, SIR_location_table)
-    return total_encounter
+    return total_encounter,model,v,w
 
 
 
